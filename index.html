@@ -1,0 +1,158 @@
+<script src="https://code.jquery.com/jquery-3.6.1.min.js" integrity="sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ=" crossorigin="anonymous"></script>
+
+<style type="text/css">	
+	body {
+		background: #20262E;
+		padding: 20px;
+		color: white;
+	}
+
+	a {
+		color: white;
+	}
+
+	.e9on1i62 {
+	/*	display:  none;*/
+	}
+
+	ul {
+	  list-style-type: none;
+	}
+</style>
+
+<input type="file" id="files" name="files[]" multiple />
+<output id="list"></output>
+<div id="content"></div>
+
+<script>
+	readFileSync = (file) => {
+		const reader = new FileReader()
+		return new Promise((resolve, reject) => {
+			reader.onload = (event) => { return resolve(event.target.result); }
+			reader.onerror = (event) => { return reject(event); }
+			reader.readAsText(file);
+		})
+	}
+
+	handleFileSelect = (event) => {
+		$('#content').empty();
+
+		let files = event.target.files;
+		let filesPromise = [];
+		let htmlOuter;
+
+		for (let i = 0, file; file = files[i]; i++) {
+			filesPromise.push(readFileSync(file));
+		}
+
+		Promise.all(filesPromise).then((values) => {
+			let jsonData = [];
+			for (let i = 0, html; html = values[i]; i++) {
+					let content = html.replace(/<img[^>]*>/g,"").replace(/<svg[^>]*>/g,"");
+					let element = $(content).find('.ecu4cbq4').children();
+
+					jsonData = $.merge(jsonData, getData(element));
+				}
+			
+			downloadCSVFromJson('Выписка.csv', jsonData);		
+		});
+	}
+
+	getData = (elements) =>	{
+		let day = [];
+		elements.each(function(index) {
+			let csv = {};
+			let temp = [];
+			let section = $(this);
+
+			$('#content').append($(this).html());
+
+			let date = parseDate(section.find('.region-operations-1v4s5bx.epqu6tw0').text());
+			let grid = section.find('li div.common__grid');
+
+			$(grid).each(function() {
+				let operation = $(this);
+				let agent = operation.find('.region-operations-1pcjhd6.e126kc0i0').text();
+				let type = operation.find('.region-operations-14bgfng.ebcuos50').text();
+				let amount = operation.find('.region-operations-5a9bvq.ez30dl33 div').text().replace(/\s+/g, '').replace(/₽/g, '');
+				amount = $.isNumeric(amount.charAt(0)) ? '-' + amount : amount;
+
+				csv = {
+					Дата: date,
+					Операция: type,
+					Категория: agent,
+					Сумма: amount
+				};
+		
+				day.push(csv);
+			})
+		});
+
+		return day;
+	}
+
+	parseDate = (stringDate) => {
+		let monthParm = {
+				января: 1,
+				февраля: 2,
+				марта: 3,
+				апреля: 4,
+				мая: 5,
+				июня: 6,
+				июля: 7,
+				августа: 8,
+				сентября: 9,
+				октября: 10,
+				ноября: 11,
+				декабря: 12,
+			};
+
+		let arDate = stringDate.split(',');
+		let temp = arDate[0].split(' ');
+
+		let day = temp[0];
+		let month = monthParm[temp[1]];
+		let year = parseInt(arDate[1]) ? parseInt(arDate[1]) : new Date().getFullYear();
+
+		let date = new Date();
+
+		switch(day)
+		{
+			case 'Вчера':
+				date.setDate(new Date().getDate() - 1);
+				break;
+			case 'Позавчера':
+				date.setDate(new Date().getDate() - 2);
+				break;
+			default :
+				date = new Date([year, month, day]);
+				break;
+		}
+
+		let ret = date.toLocaleDateString("ru-RU", { year: 'numeric', month: 'numeric', day: 'numeric' });
+
+		return ret;
+	}
+
+	downloadCSVFromJson = (filename, arrayOfJson) => {
+		// convert JSON to CSV
+		const replacer = (key, value) => value === null ? '' : value // specify how you want to handle null values here
+		const header = Object.keys(arrayOfJson[0])
+		let csv = arrayOfJson.map(row => header.map(fieldName =>
+		JSON.stringify(row[fieldName], replacer)).join(';'))
+		csv.unshift(header.join(';'))
+		csv = csv.join('\r\n')
+
+		// Create link and download
+		var link = document.createElement('a');
+		link.setAttribute('href', 'data:text/csv;charset=utf-8,%EF%BB%BF' + encodeURIComponent(csv));
+		link.setAttribute('download', filename);
+		link.style.visibility = 'hidden';
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+	};	
+
+	document.getElementById('files').addEventListener('change', handleFileSelect, false);
+
+</script>
